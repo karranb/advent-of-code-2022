@@ -19,3 +19,9 @@ Day 3
 ```bash
 $ python day3/script.py
 ```
+
+Day 4
+
+```bash
+$ python day4/script.py
+```
