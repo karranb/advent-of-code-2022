@@ -1,38 +1,30 @@
 from os.path import abspath, dirname
-import math
+import functools
 
 
-class Node:
-    def __init__(self, parent=None):
-        self.parent = parent
-        self.values = []
-
-    def add_value(self, value):
-        self.values += [value]
-
-
-
-def parse_line(line):
-    head = Node()
-    current = head
-    value = ""
-    for char in line:
-        if char == "[":
-            new = Node(current)
-            current.add_value(new)
-            current = new
+def parse_array(line_slice):
+    array = []
+    current_value = ""
+    left = 0
+    while left < len(line_slice):
+        char = line_slice[left]
+        if char == ",":
+            if current_value:
+                array += [int(current_value)]
+            current_value = ""
+        elif char == "[":
+            parsed_array, result_left = parse_array(line_slice[left + 1 :])
+            array += [parsed_array]
+            left += result_left + 2
         elif char == "]":
-            if value:
-                current.add_value(int(value))
-            value = ""
-            current = current.parent
-        elif char == ",":
-            if value:
-                current.add_value(int(value))
-            value = ""
+            if current_value:
+                array += [int(current_value)]
+            return array, left
         else:
-            value += char
-    return head
+            current_value += char
+
+        left += 1
+    return array, left
 
 
 def parse_input(input):
@@ -40,8 +32,8 @@ def parse_input(input):
     current = []
     for line in input.split("\n"):
         if line != "":
-            head = parse_line(line)
-            current += [head]
+            array = parse_array(line[1:])[0]
+            current += [array]
             if len(current) == 2:
                 result += [current]
                 current = []
@@ -49,63 +41,66 @@ def parse_input(input):
 
 
 def check_packet_pair(packet_1, packet_2):
-    if len(packet_1.values) == 0 and len(packet_2.values) == 0:
-        return True
-    print(packet_1.values, packet_2.values)
-    for index, packet_1_value in enumerate(packet_1.values):
-        print('hum', index)
-        if type(packet_1_value) == int:
-            if index <= len(packet_2.values) - 1:
-                packet_2_value = packet_2.values[index]
-                if type(packet_2_value) == int:
-                    if packet_1_value < packet_2_value:
-                        return True
-                    if packet_2_value < packet_1_value:
-                        return False
-                else:
-                    transformed_packet = Node()
-                    transformed_packet.add_value(packet_1_value)
-                    result = check_packet_pair(transformed_packet, packet_2_value)
-                    if result == True or result == False:
-                        return result
-            else:
+    left = 0
+    while left < len(packet_1):
+        packet_1_item = packet_1[left]
+        if left == len(packet_2):
+            return False
+        packet_2_item = packet_2[left]
+        if type(packet_1_item) == int and type(packet_2_item) == int:
+            if packet_1_item < packet_2_item:
+                return True
+            if packet_1_item > packet_2_item:
                 return False
-        else:
-            if index <= len(packet_2.values) - 1:
-                packet_2_value = packet_2.values[index]
-                if type(packet_2_value) == int:
-                    transformed_packet = Node()
-                    transformed_packet.add_value(packet_2)
-                    result = check_packet_pair(packet_1_value, transformed_packet)
-                    if result == True or result == False:
-                        return result
-                else:
-                    print('aqui', packet_1_value, packet_2_value)
-                    result = check_packet_pair(packet_1_value, packet_2_value)
-                    if result == True or result == False:
-                        return result
-            else:
-                return False
-    if len(packet_1.values) < len(packet_2.values):
-        return True
-    if len(packet_1.values) > len(packet_2.values):
+        if type(packet_1_item) == int and type(packet_2_item) == list:
+            result = check_packet_pair([packet_1_item], packet_2_item)
+            if result is not None:
+                return result
+        if type(packet_1_item) == list and type(packet_2_item) == int:
+            result = check_packet_pair(packet_1_item, [packet_2_item])
+            if result is not None:
+                return result
+        if type(packet_1_item) == list and type(packet_2_item) == list:
+            result = check_packet_pair(packet_1_item, packet_2_item)
+            if result is not None:
+                return result
+        left += 1
+    if len(packet_1) > len(packet_2):
         return False
+    if len(packet_1) < len(packet_2):
+
+        return True
     return None
 
 
+def compare_packet_pair(packet_1, packet_2):
+    check = check_packet_pair(packet_1, packet_2)
+    return 0 if check is None else 1 if check is False else -1
+
+
 def part_1(file):
-    packets_pairs = parse_input(file)
+    packet_pairs = parse_input(file)
     result = 0
-    for index, packet_pair in enumerate(packets_pairs):
-        if check_packet_pair(*packet_pair):
-            print(index + 1)
+    for index, packet_pair in enumerate(packet_pairs):
+        if check_packet_pair(*packet_pair) is not False:
             result += index + 1
 
     return result
 
 
 def part_2(file):
-    return 0
+    packets = []
+    new_input = parse_input(
+        """
+[[2]]
+[[6]]
+    """
+    )
+    old_input = parse_input(file)
+    for packet_1, packet_2 in old_input + new_input:
+        packets += [packet_1, packet_2]
+    packets = sorted(packets, key=functools.cmp_to_key(compare_packet_pair))
+    return (packets.index(new_input[0][0]) + 1) * (packets.index(new_input[0][1]) + 1)
 
 
 day_path = dirname(abspath(__file__))
